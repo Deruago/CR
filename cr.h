@@ -539,7 +539,19 @@ namespace cr::gen
             using type = typename inherit<>::type;
         };
 
+        template<typename... InheritTs>
+        struct inherit
+        {
+            using type = typename ::cr::gen::stuc<Ts...>::names<>::template inherit<InheritTs...>::type;
+        };
+
         using type = typename names<>::type;
+    };
+
+    template<typename... InheritTs>
+    struct inh
+    {
+        using type = typename ::cr::gen::stuc<>::names<>::inherit<InheritTs...>::type;
     };
 }
 
