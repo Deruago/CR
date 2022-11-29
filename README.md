@@ -5,7 +5,7 @@ CR is a library which offers various meta functions which enable compile time re
 ## Supported Functionality
 
 - Datastructure Generation
-- Inheritance of Datastructures (1 Deep inheritance)
+- Multiple Inheritance of Datastructures
 - Naming of Members
 
 ## Planned Functionality
