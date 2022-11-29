@@ -7,14 +7,17 @@ CR is a library which offers various meta functions which enable compile time re
 - Datastructure Generation
 - Multiple Inheritance of Datastructures
 - Naming of Members
+- Member Function Generation (Partial, not every statement is supported)
 
 ## Planned Functionality
 
+- Variable Aliases
 - Function Generation
-- Member Function Generation
 - Exporting Of Datastructures
 - Exporting Of Functions
 - Member Accessibility Levels
+- Improved Error Messages
+- Code Generation utilities
 
 ## Why use CR?
 
@@ -66,3 +69,7 @@ CR is able to name members without any performance penalties.
 ## Current Status
 
 Very WIP, however, it seems to reliably work for creating datastructures.
+
+## Tested
+
+It works with the latests version of Clang.
