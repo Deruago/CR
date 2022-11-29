@@ -68,7 +68,7 @@ namespace cr::gen
                     {
                         using original_type = OriginalT;
                         using type = DataT;
-                        DataT value;
+                        std::conditional_t<std::is_same_v<DataT, void>, int, DataT> value;
                     };
 
                     template<int count, typename OriginalT, typename... DataTs>
@@ -110,11 +110,6 @@ namespace cr::gen
                     template<typename derived>
                     struct InheritScope : InheritImpl<0, derived, InheritTs...>
                     {
-                        template<int localId, typename next>
-                        auto& get_alt()
-                        {
-                            return this->next::template get_alt<localId>();
-                        }
                     };
                     
                     template<typename derived>
@@ -123,7 +118,7 @@ namespace cr::gen
                     };
 
                     struct Implementation : 
-                        private InheritScope<Implementation>,
+                        InheritScope<Implementation>,
                         DataScope<Implementation>
                     {
                         using this_type = Implementation;
@@ -147,31 +142,14 @@ namespace cr::gen
                                 static constexpr auto value = t_::meta::total_members + GetTotalMembers<ts_...>::value;
                             };
 
-                            static constexpr auto total_members = sizeof...(Ts) + GetTotalMembers<InheritTs...>::value;
+                            static constexpr auto total_members = total_owning_members + GetTotalMembers<InheritTs...>::value;
 
                             static constexpr auto total_direct_inherited_bases = sizeof...(InheritTs);
 
                             template<int baseId>
                             struct GetBaseByBaseId
                             {
-                                template<int baseId_, typename... InheritTs_>
-                                struct GetBaseByBaseIdImpl
-                                {
-
-                                };
-
-                                template<int count, typename T_, typename... Ts_>
-                                struct GetBaseByBaseIdImpl<count, T_, Ts_...>
-                                {
-                                    using type = typename GetBaseByBaseIdImpl<count - 1, Ts_...>::type;
-                                };
-
-                                template<typename T_, typename... Ts_>
-                                struct GetBaseByBaseIdImpl<0, T_, Ts_...>
-                                {
-                                    using type = T_;
-                                };
-                                using type = typename GetBaseByBaseIdImpl<baseId, InheritTs...>::type;
+                                using type = typename ::cr::meta::template NthOfVariadic<baseId, InheritTs...>::type;
                             };
 
                             template<int memberId>
@@ -300,42 +278,42 @@ namespace cr::gen
                                 template<int count, typename T_>
                                 struct InheritType_FromGeneralIdImpl<count, false, T_>
                                 {
-                                    static constexpr auto value = count - T_::meta::total_members;
+                                    static constexpr int value = count - T_::meta::total_members;
                                     using type = this_type;
                                 };
 
                                 template<int count>
                                 struct InheritType_FromGeneralIdImpl<count, false>
                                 {
-                                    static constexpr auto value = count;
+                                    static constexpr int value = count;
                                     using type = this_type;
                                 };
 
                                 template<int count, typename T_, typename... Ts_>
                                 struct InheritType_FromGeneralIdImpl<count, false, T_, Ts_...>
                                 {
-                                    static constexpr auto new_count = count - T_::meta::total_members;
+                                    static constexpr int new_count = count - T_::meta::total_members;
                                     using type = typename InheritType_FromGeneralIdImplStart<new_count, Ts_...>::type;
                                 };
 
                                 template<int count, typename T_, typename... Ts_>
                                 struct InheritType_FromGeneralIdImpl<count, true, T_, Ts_...>
                                 {
-                                    static constexpr auto value = count;
+                                    static constexpr int value = count;
                                     using type = T_;
                                 };
 
                                 template<int count, typename... Ts_>
                                 struct InheritType_FromGeneralIdImplStart
                                 {
-                                    static constexpr auto value = count;
+                                    static constexpr int value = count;
                                     using type = this_type;
                                 };
 
                                 template<int count, typename T_, typename... Ts_>
                                 struct InheritType_FromGeneralIdImplStart<count, T_, Ts_...>
                                 {
-                                    static constexpr auto value = count;
+                                    static constexpr int value = count;
                                     using type = typename InheritType_FromGeneralIdImpl<
                                         count,
                                         (count < T_::meta::total_members),
@@ -344,8 +322,90 @@ namespace cr::gen
                                     ::type;
                                 };
 
-                                using type = typename InheritType_FromGeneralIdImplStart<memberId, InheritTs...>::type;
-                                static constexpr auto value = InheritType_FromGeneralIdImplStart<memberId, InheritTs...>::value;
+                                using type = typename InheritType_FromGeneralIdImplStart<memberId, InheritTs..., this_type>::type;
+                                static constexpr auto value = InheritType_FromGeneralIdImplStart<memberId, InheritTs..., this_type>::value;
+                            };
+
+                            template<int memberId>
+                            struct InheritBaseId_FromGeneralId
+                            {
+                                template<int base_id_, int count, typename... ts_>
+                                struct Start;
+
+                                template<int base_id_, int count, bool inRange, typename... ts_>
+                                struct Check
+                                {
+                                    // Maps to void if the index was not mapped
+                                    // Otherwise maps to this_type
+                                    using type = typename std::conditional<
+                                        (count < this_type::meta::total_owning_members),
+                                        this_type,
+                                        void>::type;
+                                    static constexpr auto value = count;
+                                    static constexpr auto base_id = base_id_;
+                                };
+
+                                template<int base_id_, int count, typename t_, typename... ts_>
+                                struct Check<base_id_, count, true, t_, ts_...>
+                                {
+                                    using type = t_;
+                                    static constexpr auto value = count;
+                                    static constexpr auto base_id = base_id_;
+                                };
+
+                                template<int base_id_, int count, typename t_, typename... ts_>
+                                struct Check<base_id_, count, false, t_, ts_...>
+                                {
+                                    static constexpr int new_count = count - t_::meta::total_members;
+                                    using type = typename Start<base_id_ + 1, new_count, ts_...>::type;
+                                        
+                                    static constexpr int value = Start<base_id_ + 1, new_count, ts_...>::value;
+                                    static constexpr int base_id = Start<base_id_ + 1, new_count, ts_...>::base_id;
+                                };
+
+                                template<int base_id_, int count, typename... ts_>
+                                struct Start
+                                {
+                                    using type = typename Check<
+                                        base_id_,
+                                        count,
+                                        false>::type;
+                                    static constexpr int value = Check<
+                                        base_id_,
+                                        count,
+                                        false>::value;
+                                    static constexpr int base_id = Check<
+                                        base_id_,
+                                        count,
+                                        false>::base_id;
+                                };
+
+                                template<int base_id_, int count, typename t_, typename... ts_>
+                                struct Start<base_id_, count, t_, ts_...>
+                                {
+                                    using type = typename Check<
+                                        base_id_,
+                                        count,
+                                        (count < t_::meta::total_members),
+                                        t_,
+                                        ts_...>::type;
+                                    static constexpr int value = Check<
+                                        base_id_,
+                                        count,
+                                        (count < t_::meta::total_members),
+                                        t_,
+                                        ts_...>::value;
+                                    static constexpr int base_id = Check<
+                                        base_id_,
+                                        count,
+                                        (count < t_::meta::total_members),
+                                        t_,
+                                        ts_...>::base_id;
+                                };
+
+                                using type = typename Start<0, memberId, InheritTs...>::type;
+                                static constexpr int value = Start<0, memberId, InheritTs...>::value;
+                                static constexpr int base_id = Start<0, memberId, InheritTs...>::base_id;
                             };
 
                             template<int id>
@@ -399,27 +459,46 @@ namespace cr::gen
                         auto& get()
                         {
                             using correctStruct = 
-                                typename meta::template InheritType_FromGeneralId<id>::type;
+                                typename meta::template InheritBaseId_FromGeneralId<id>::type;
+                            
                             static constexpr auto localId =
-                                meta::template LocalId_FromGeneralId<id>::value;
+                                meta::template InheritBaseId_FromGeneralId<id>::value;
+                            static constexpr auto baseId = 
+                                meta::template InheritBaseId_FromGeneralId<id>::base_id;
 
-                            using dataLeafLowered = typename correctStruct::template DataLeaf<localId, correctStruct, getT>;
+                            if constexpr (std::is_same_v<this_type, correctStruct>)
+                            {
+                                using getTCompare = typename correctStruct::meta::template GetTypeFromId<localId>::type;
 
-                            static_assert(std::is_base_of<
-                                dataLeafLowered,
-                                Implementation>::value, 
-                                "Given Id is not covered by any of the bases or internally.");
+                                static_assert(std::is_same_v<getT, getTCompare>, "Given T is not the Expected Type");
 
-                            return this->dataLeafLowered::value;
+                                using dataLeafLowered = typename DataScope<this_type>::template DataLeaf<localId, correctStruct, getT>;
+
+                                static_assert(std::is_base_of<
+                                    dataLeafLowered,
+                                    Implementation>::value, 
+                                    "Given Id is not covered by any of the bases or internally.");
+
+                                return this->dataLeafLowered::value;
+                            }
+                            else
+                            {
+                                using requiredInheritLeaf = typename InheritScope<this_type>::template InheritLeaf<baseId, this_type, correctStruct>;
+                                return requiredInheritLeaf::template get<localId>();
+                            }
                         }
 
                         template<int id>
                         auto& get()
                         {
                             using correctStruct = 
-                                typename meta::template InheritType_FromGeneralId<id>::type;
+                                typename meta::template InheritBaseId_FromGeneralId<id>::type;
+                            
                             static constexpr auto localId =
-                                meta::template LocalId_FromGeneralId<id>::value;
+                                meta::template InheritBaseId_FromGeneralId<id>::value;
+                            static constexpr auto baseId = 
+                                meta::template InheritBaseId_FromGeneralId<id>::base_id;
+
                             if constexpr (std::is_same_v<this_type, correctStruct>)
                             {
                                 using getT = typename correctStruct::meta::template GetTypeFromId<localId>::type;
@@ -435,7 +514,8 @@ namespace cr::gen
                             }
                             else
                             {
-                                return correctStruct::template get<localId>();
+                                using requiredInheritLeaf = typename InheritScope<this_type>::template InheritLeaf<baseId, this_type, correctStruct>;
+                                return requiredInheritLeaf::template get<localId>();
                             }
                         }
                         template<const str& idName>
@@ -448,32 +528,6 @@ namespace cr::gen
                                 Implementation,
                                 typename meta::template GetTypeFromId<id>::type
                             >::value;
-                        }
-
-                        template<int id>
-                        auto& get_alt()
-                        {
-                            using correctStruct = 
-                                typename meta::template InheritType_FromGeneralId<id>::type;
-                            static constexpr auto localId =
-                                meta::template InheritType_FromGeneralId<id>::value;
-                            if constexpr (std::is_same_v<this_type, correctStruct>)
-                            {
-                                using getT = typename correctStruct::meta::template GetTypeFromId<localId>::type;
-
-                                using dataLeafLowered = typename DataScope<this_type>::template DataLeaf<localId, correctStruct, getT>;
-
-                                static_assert(std::is_base_of<
-                                    dataLeafLowered,
-                                    Implementation>::value, 
-                                    "Given Id is not covered by any of the bases or internally.");
-
-                                return this->dataLeafLowered::value;
-                            }
-                            else
-                            {
-                                return  InheritScope<this_type>::template get_alt<localId, correctStruct>();
-                            }
                         }
                     };
                     using type = Implementation;
