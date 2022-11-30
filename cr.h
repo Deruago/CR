@@ -96,6 +96,13 @@ namespace cr::gen
         static constexpr int value = val_;
     };
 
+    struct create_bool_base {};
+    template<bool val_>
+    struct create_bool : create_bool_base
+    {
+        static constexpr bool value = val_;
+    };
+
     // Variable reference, where id == variable id
     struct var_base {};
     template<int id>
@@ -110,6 +117,36 @@ namespace cr::gen
     {
         using lhs = LHS_;
         using rhs = RHS_;
+    };
+
+    struct if_base {};
+    template<typename conditional_stmt_, typename action_stmt_>
+    struct iff : if_base
+    {
+        using conditional_stmt = conditional_stmt_;
+        using action_stmt = action_stmt_;
+    };
+
+    struct elif_base {};
+    template<typename conditional_stmt_, typename action_stmt_>
+    struct elif : elif_base
+    {
+        using conditional_stmt = conditional_stmt_;
+        using action_stmt = action_stmt_;
+    };
+
+    struct else_base {};
+    template<typename action_stmt_>
+    struct els : else_base
+    {
+        using action_stmt = action_stmt_;
+    };
+
+    struct forc_base {};
+    template<typename for_count_stmt_>
+    struct forc : forc_base
+    {
+        using for_count_stmt = for_count_stmt_;
     };
 }
 
@@ -153,6 +190,12 @@ namespace cr::gen
                         ::parse_stmts<originalDatastructure, memberFunction, stmt, stmts...>
                         ::template function_create_int<user_argument_count>(args...);
                 }
+                else if constexpr(std::is_base_of_v<create_bool_base, stmt>)
+                {
+                    return ::cr::gen::interpreter
+                        ::parse_stmts<originalDatastructure, memberFunction, stmt, stmts...>
+                        ::template function_create_bool<user_argument_count>(args...);
+                }
                 else if constexpr(std::is_base_of_v<return_variable_base, stmt>)
                 {
                     return ::cr::gen::interpreter
@@ -166,6 +209,24 @@ namespace cr::gen
                         ::template function_var<user_argument_count>(args...);
                 }
                 else if constexpr(std::is_base_of_v<add_base, stmt>)
+                {
+                    return ::cr::gen::interpreter
+                        ::parse_stmts<originalDatastructure, memberFunction, stmt, stmts...>
+                        ::template function_add<user_argument_count>(args...);
+                }
+                else if constexpr(std::is_base_of_v<if_base, stmt>)
+                {
+
+                }
+                else if constexpr(std::is_base_of_v<elif_base, stmt>)
+                {
+
+                }
+                else if constexpr(std::is_base_of_v<else_base, stmt>)
+                {
+
+                }
+                else if constexpr(std::is_base_of_v<forc_base, stmt>)
                 {
 
                 }
@@ -231,6 +292,24 @@ namespace cr::gen
             static inline int function_create_int(Arguments&&... args [[maybe_unused]])
             {
                 return stmt::value;
+            }
+
+            template<int user_argument_count, typename... Arguments>
+            static inline bool function_create_bool(Arguments&&... args [[maybe_unused]])
+            {
+                return stmt::value;
+            }
+
+            template<int user_argument_count, typename... Arguments>
+            static inline auto function_add(Arguments&&... args [[maybe_unused]])
+            {
+                return ::cr::gen::interpreter
+                    ::parse_stmts<originalDatastructure, memberFunction, typename stmt::lhs>
+                    ::template function_impl<user_argument_count, Arguments...>(args...)
+                    +
+                    ::cr::gen::interpreter
+                    ::parse_stmts<originalDatastructure, memberFunction, typename stmt::rhs>
+                    ::template function_impl<user_argument_count, Arguments...>(args...);
             }
 
             template<int user_argument_count, typename... Arguments>
