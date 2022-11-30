@@ -119,6 +119,78 @@ namespace cr::gen
         using rhs = RHS_;
     };
 
+    struct min_base {};
+    template<typename LHS_, typename RHS_>
+    struct min : min_base
+    {
+        using lhs = LHS_;
+        using rhs = RHS_;
+    };
+
+    struct mul_base {};
+    template<typename LHS_, typename RHS_>
+    struct mul : mul_base
+    {
+        using lhs = LHS_;
+        using rhs = RHS_;
+    };
+
+    struct div_base {};
+    template<typename LHS_, typename RHS_>
+    struct div : div_base
+    {
+        using lhs = LHS_;
+        using rhs = RHS_;
+    };
+
+    struct mod_base {};
+    template<typename LHS_, typename RHS_>
+    struct mod : mod_base
+    {
+        using lhs = LHS_;
+        using rhs = RHS_;
+    };
+
+    struct eq_base {};
+    template<typename LHS_, typename RHS_>
+    struct eq : eq_base
+    {
+        using lhs = LHS_;
+        using rhs = RHS_;
+    };
+
+    struct gt_base {};
+    template<typename LHS_, typename RHS_>
+    struct gt : gt_base
+    {
+        using lhs = LHS_;
+        using rhs = RHS_;
+    };
+
+    struct gteq_base {};
+    template<typename LHS_, typename RHS_>
+    struct gteq : gteq_base
+    {
+        using lhs = LHS_;
+        using rhs = RHS_;
+    };
+
+    struct lt_base {};
+    template<typename LHS_, typename RHS_>
+    struct lt : lt_base
+    {
+        using lhs = LHS_;
+        using rhs = RHS_;
+    };
+
+    struct lteq_base {};
+    template<typename LHS_, typename RHS_>
+    struct lteq : lteq_base
+    {
+        using lhs = LHS_;
+        using rhs = RHS_;
+    };
+
     struct if_base {};
     template<typename conditional_stmt_, typename action_stmt_>
     struct iff : if_base
@@ -214,21 +286,83 @@ namespace cr::gen
                         ::parse_stmts<originalDatastructure, memberFunction, stmt, stmts...>
                         ::template function_add<user_argument_count>(args...);
                 }
+                else if constexpr(std::is_base_of_v<min_base, stmt>)
+                {
+                    return ::cr::gen::interpreter
+                        ::parse_stmts<originalDatastructure, memberFunction, stmt, stmts...>
+                        ::template function_subtract<user_argument_count>(args...);
+                }
+                else if constexpr(std::is_base_of_v<mul_base, stmt>)
+                {
+                    return ::cr::gen::interpreter
+                        ::parse_stmts<originalDatastructure, memberFunction, stmt, stmts...>
+                        ::template function_multiply<user_argument_count>(args...);
+                }
+                else if constexpr(std::is_base_of_v<div_base, stmt>)
+                {
+                    return ::cr::gen::interpreter
+                        ::parse_stmts<originalDatastructure, memberFunction, stmt, stmts...>
+                        ::template function_divide<user_argument_count>(args...);
+                }
+                else if constexpr(std::is_base_of_v<mod_base, stmt>)
+                {
+                    return ::cr::gen::interpreter
+                        ::parse_stmts<originalDatastructure, memberFunction, stmt, stmts...>
+                        ::template function_mod<user_argument_count>(args...);
+                }
+                else if constexpr(std::is_base_of_v<eq_base, stmt>)
+                {
+                    return ::cr::gen::interpreter
+                        ::parse_stmts<originalDatastructure, memberFunction, stmt, stmts...>
+                        ::template function_eq<user_argument_count>(args...);
+                }
+                else if constexpr(std::is_base_of_v<gteq_base, stmt>)
+                {
+                    return ::cr::gen::interpreter
+                        ::parse_stmts<originalDatastructure, memberFunction, stmt, stmts...>
+                        ::template function_gteq<user_argument_count>(args...);
+                }
+                else if constexpr(std::is_base_of_v<lteq_base, stmt>)
+                {
+                    return ::cr::gen::interpreter
+                        ::parse_stmts<originalDatastructure, memberFunction, stmt, stmts...>
+                        ::template function_lteq<user_argument_count>(args...);
+                }
+                else if constexpr(std::is_base_of_v<gt_base, stmt>)
+                {
+                    return ::cr::gen::interpreter
+                        ::parse_stmts<originalDatastructure, memberFunction, stmt, stmts...>
+                        ::template function_gt<user_argument_count>(args...);
+                }
+                else if constexpr(std::is_base_of_v<lt_base, stmt>)
+                {
+                    return ::cr::gen::interpreter
+                        ::parse_stmts<originalDatastructure, memberFunction, stmt, stmts...>
+                        ::template function_lt<user_argument_count>(args...);
+                }
                 else if constexpr(std::is_base_of_v<if_base, stmt>)
                 {
-
+                    return ::cr::gen::interpreter
+                        ::parse_stmts<originalDatastructure, memberFunction, stmt, stmts...>
+                        ::template function_if<user_argument_count>(args...);
                 }
                 else if constexpr(std::is_base_of_v<elif_base, stmt>)
                 {
-
+                    return ::cr::gen::interpreter
+                        ::parse_stmts<originalDatastructure, memberFunction, stmt, stmts...>
+                        ::template function_elif<user_argument_count>(args...);
                 }
                 else if constexpr(std::is_base_of_v<else_base, stmt>)
                 {
-
+                    return ::cr::gen::interpreter
+                        ::parse_stmts<originalDatastructure, memberFunction, stmt, stmts...>
+                        ::template function_else<user_argument_count>(args...);
                 }
                 else if constexpr(std::is_base_of_v<forc_base, stmt>)
                 {
-
+                    return ::cr::gen::interpreter
+                        ::parse_stmts<originalDatastructure, memberFunction, stmt, stmts...>
+                        ::template function_forc<user_argument_count>(args...);
                 }
                 else
                 {
@@ -310,6 +444,227 @@ namespace cr::gen
                     ::cr::gen::interpreter
                     ::parse_stmts<originalDatastructure, memberFunction, typename stmt::rhs>
                     ::template function_impl<user_argument_count, Arguments...>(args...);
+            }
+
+            template<int user_argument_count, typename... Arguments>
+            static inline auto function_multiply(Arguments&&... args [[maybe_unused]])
+            {
+                return ::cr::gen::interpreter
+                    ::parse_stmts<originalDatastructure, memberFunction, typename stmt::lhs>
+                    ::template function_impl<user_argument_count, Arguments...>(args...)
+                    *
+                    ::cr::gen::interpreter
+                    ::parse_stmts<originalDatastructure, memberFunction, typename stmt::rhs>
+                    ::template function_impl<user_argument_count, Arguments...>(args...);
+            }
+
+            template<int user_argument_count, typename... Arguments>
+            static inline auto function_divide(Arguments&&... args [[maybe_unused]])
+            {
+                return ::cr::gen::interpreter
+                    ::parse_stmts<originalDatastructure, memberFunction, typename stmt::lhs>
+                    ::template function_impl<user_argument_count, Arguments...>(args...)
+                    /
+                    ::cr::gen::interpreter
+                    ::parse_stmts<originalDatastructure, memberFunction, typename stmt::rhs>
+                    ::template function_impl<user_argument_count, Arguments...>(args...);
+            }
+
+            template<int user_argument_count, typename... Arguments>
+            static inline auto function_mod(Arguments&&... args [[maybe_unused]])
+            {
+                return ::cr::gen::interpreter
+                    ::parse_stmts<originalDatastructure, memberFunction, typename stmt::lhs>
+                    ::template function_impl<user_argument_count, Arguments...>(args...)
+                    %
+                    ::cr::gen::interpreter
+                    ::parse_stmts<originalDatastructure, memberFunction, typename stmt::rhs>
+                    ::template function_impl<user_argument_count, Arguments...>(args...);
+            }
+
+            template<int user_argument_count, typename... Arguments>
+            static inline auto function_eq(Arguments&&... args [[maybe_unused]])
+            {
+                return ::cr::gen::interpreter
+                    ::parse_stmts<originalDatastructure, memberFunction, typename stmt::lhs>
+                    ::template function_impl<user_argument_count, Arguments...>(args...)
+                    ==
+                    ::cr::gen::interpreter
+                    ::parse_stmts<originalDatastructure, memberFunction, typename stmt::rhs>
+                    ::template function_impl<user_argument_count, Arguments...>(args...);
+            }
+
+            template<int user_argument_count, typename... Arguments>
+            static inline auto function_gt(Arguments&&... args [[maybe_unused]])
+            {
+                return ::cr::gen::interpreter
+                    ::parse_stmts<originalDatastructure, memberFunction, typename stmt::lhs>
+                    ::template function_impl<user_argument_count, Arguments...>(args...)
+                    >
+                    ::cr::gen::interpreter
+                    ::parse_stmts<originalDatastructure, memberFunction, typename stmt::rhs>
+                    ::template function_impl<user_argument_count, Arguments...>(args...);
+            }
+
+            template<int user_argument_count, typename... Arguments>
+            static inline auto function_gteq(Arguments&&... args [[maybe_unused]])
+            {
+                return ::cr::gen::interpreter
+                    ::parse_stmts<originalDatastructure, memberFunction, typename stmt::lhs>
+                    ::template function_impl<user_argument_count, Arguments...>(args...)
+                    >=
+                    ::cr::gen::interpreter
+                    ::parse_stmts<originalDatastructure, memberFunction, typename stmt::rhs>
+                    ::template function_impl<user_argument_count, Arguments...>(args...);
+            }
+
+            template<int user_argument_count, typename... Arguments>
+            static inline auto function_lt(Arguments&&... args [[maybe_unused]])
+            {
+                return ::cr::gen::interpreter
+                    ::parse_stmts<originalDatastructure, memberFunction, typename stmt::lhs>
+                    ::template function_impl<user_argument_count, Arguments...>(args...)
+                    <
+                    ::cr::gen::interpreter
+                    ::parse_stmts<originalDatastructure, memberFunction, typename stmt::rhs>
+                    ::template function_impl<user_argument_count, Arguments...>(args...);
+            }
+
+            template<int user_argument_count, typename... Arguments>
+            static inline auto function_lteq(Arguments&&... args [[maybe_unused]])
+            {
+                return ::cr::gen::interpreter
+                    ::parse_stmts<originalDatastructure, memberFunction, typename stmt::lhs>
+                    ::template function_impl<user_argument_count, Arguments...>(args...)
+                    <=
+                    ::cr::gen::interpreter
+                    ::parse_stmts<originalDatastructure, memberFunction, typename stmt::rhs>
+                    ::template function_impl<user_argument_count, Arguments...>(args...);
+            }
+
+            template<int user_argument_count, typename... Arguments>
+            static inline auto function_subtract(Arguments&&... args [[maybe_unused]])
+            {
+                return ::cr::gen::interpreter
+                    ::parse_stmts<originalDatastructure, memberFunction, typename stmt::lhs>
+                    ::template function_impl<user_argument_count, Arguments...>(args...)
+                    -
+                    ::cr::gen::interpreter
+                    ::parse_stmts<originalDatastructure, memberFunction, typename stmt::rhs>
+                    ::template function_impl<user_argument_count, Arguments...>(args...);
+            }
+
+
+            template<int user_argument_count, typename... Arguments>
+            static inline auto function_if(Arguments&&... args [[maybe_unused]])
+            {
+                if constexpr (sizeof...(stmts) > 0)
+                {
+                    if constexpr (std::is_base_of_v<elif_base, typename ::cr::meta::FirstOfVariadic<stmts...>::type>)
+                    {
+                        // Inside the else
+                        if (::cr::gen::interpreter::parse_stmts<originalDatastructure, memberFunction, typename stmt::conditional_stmt>
+                            ::template function_impl<user_argument_count, Arguments...>(args...))
+                        {
+                            return ::cr::gen::interpreter::parse_stmts<originalDatastructure, memberFunction, typename stmt::action_stmt, stmts...>
+                            ::template function_impl<user_argument_count, Arguments...>(args...);
+                        }
+                        else
+                        {
+                            return ::cr::gen::interpreter::parse_stmts<originalDatastructure, memberFunction, stmts...>
+                            ::template function_impl<user_argument_count, Arguments...>(args...);
+                        }
+                    }
+                    else
+                    {
+                        // Outside the else
+                        if (::cr::gen::interpreter::parse_stmts<originalDatastructure, memberFunction, typename stmt::conditional_stmt>
+                            ::template function_impl<user_argument_count, Arguments...>(args...))
+                        {
+                            return ::cr::gen::interpreter::parse_stmts<originalDatastructure, memberFunction, typename stmt::action_stmt, stmts...>
+                            ::template function_impl<user_argument_count, Arguments...>(args...);
+                        }
+
+                        return ::cr::gen::interpreter::parse_stmts<originalDatastructure, memberFunction, stmts...>
+                            ::template function_impl<user_argument_count, Arguments...>(args...);
+                    }
+                }
+                else
+                {
+                    // Standard if
+                    // With default return else
+                    if (::cr::gen::interpreter::parse_stmts<originalDatastructure, memberFunction, typename stmt::conditional_stmt>
+                            ::template function_impl<user_argument_count, Arguments...>(args...))
+                    {
+                        return ::cr::gen::interpreter::parse_stmts<originalDatastructure, memberFunction, typename stmt::action_stmt, stmts...>
+                        ::template function_impl<user_argument_count, Arguments...>(args...);
+                    }
+
+                    return ::cr::gen::interpreter::parse_stmts<originalDatastructure, memberFunction, stmts...>
+                    ::template function_impl<user_argument_count, Arguments...>(args...);
+                }
+            }
+
+            template<int user_argument_count, typename... Arguments>
+            static inline auto function_elif(Arguments&&... args [[maybe_unused]])
+            {
+                if constexpr (sizeof...(stmts) > 0)
+                {
+                    if constexpr (std::is_base_of_v<elif_base, typename ::cr::meta::FirstOfVariadic<stmts...>::type>)
+                    {
+                        // Inside the else
+                        if (::cr::gen::interpreter::parse_stmts<originalDatastructure, memberFunction, typename stmt::conditional_stmt>
+                            ::template function_impl<user_argument_count, Arguments...>(args...))
+                        {
+                            return ::cr::gen::interpreter::parse_stmts<originalDatastructure, memberFunction, typename stmt::action_stmt, stmts...>
+                            ::template function_impl<user_argument_count, Arguments...>(args...);
+                        }
+                        else
+                        {
+                            return ::cr::gen::interpreter::parse_stmts<originalDatastructure, memberFunction, stmts...>
+                            ::template function_impl<user_argument_count, Arguments...>(args...);
+                        }
+                    }
+                    else
+                    {
+                        // Outside the else
+                        if (::cr::gen::interpreter::parse_stmts<originalDatastructure, memberFunction, typename stmt::conditional_stmt>
+                            ::template function_impl<user_argument_count, Arguments...>(args...))
+                        {
+                            return ::cr::gen::interpreter::parse_stmts<originalDatastructure, memberFunction, typename stmt::action_stmt, stmts...>
+                            ::template function_impl<user_argument_count, Arguments...>(args...);
+                        }
+
+                        return ::cr::gen::interpreter::parse_stmts<originalDatastructure, memberFunction, stmts...>
+                            ::template function_impl<user_argument_count, Arguments...>(args...);
+                    }
+                }
+                else
+                {
+                    // Standard if
+                    // With default return else
+                    if (::cr::gen::interpreter::parse_stmts<originalDatastructure, memberFunction, typename stmt::conditional_stmt>
+                            ::template function_impl<user_argument_count, Arguments...>(args...))
+                    {
+                        return ::cr::gen::interpreter::parse_stmts<originalDatastructure, memberFunction, typename stmt::action_stmt, stmts...>
+                        ::template function_impl<user_argument_count, Arguments...>(args...);
+                    }
+
+                    return ::cr::gen::interpreter::parse_stmts<originalDatastructure, memberFunction, stmts...>
+                    ::template function_impl<user_argument_count, Arguments...>(args...);
+                }
+            }
+
+            template<int user_argument_count, typename... Arguments>
+            static inline auto function_else(Arguments&&... args [[maybe_unused]])
+            {
+                return ::cr::gen::interpreter::parse_stmts<originalDatastructure, memberFunction, typename stmt::action_stmt, stmts...>
+                ::template function_impl<user_argument_count, Arguments...>(args...);
+            }
+
+            template<int user_argument_count, typename... Arguments>
+            static inline auto function_forc(Arguments&&... args [[maybe_unused]])
+            {
             }
 
             template<int user_argument_count, typename... Arguments>
