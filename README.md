@@ -7,7 +7,7 @@ CR is a library which offers various meta functions which enable compile time re
 - Datastructure Generation
 - Multiple Inheritance of Datastructures
 - Naming of Members
-- Member Function Generation (Partial, not every statement is supported)
+- Member Function Generation (While loops function, however, they automatically return upon a false condition)
 
 ## Planned Functionality
 
