@@ -16,6 +16,10 @@ namespace cr
 
 namespace cr::meta
 {
+    [[noreturn]] inline void unreachable()
+    {
+    }
+
     template<typename... Ts>
     struct FirstOfVariadic
     {
@@ -208,9 +212,50 @@ namespace cr::gen
         using type = echo_stmt;
     };
 
+    // Temporary ID
+    struct tid_base {};
+    template<int id>
+    struct tid : tid_base
+    {
+        static constexpr int value = id;
+    };
+
+    struct vid_base {};
+    template<int id>
+    struct vid : vid_base
+    {
+        static constexpr int value = id;
+    };
+
+    struct uid_base {};
+    template<int id>
+    struct uid : uid_base
+    {
+        static constexpr int value = id;
+    };
+
+    struct id_base {};
+    template<typename expr>
+    struct id : id_base
+    {
+        using type = expr;
+    };
+
     struct create_variable_base {};
-    template<typename T, typename Q>
+    template<typename... Ts>
     struct create_variable : create_variable_base
+    {
+    };
+
+    // Automatically deduce the type given the initialize statement
+    template<typename T>
+    struct create_variable<T> : create_variable_base
+    {
+        using initialize_stmt = T;
+    };
+
+    template<typename T, typename Q>
+    struct create_variable<T, Q> : create_variable_base
     {
         using type = T;
         using initialize_stmt = Q;
@@ -237,6 +282,13 @@ namespace cr::gen
         static constexpr bool value = val_;
     };
 
+    // Represents this pointer
+    struct this_base {};
+    struct thi : this_base
+    {
+    };
+
+    // Accesses user + temporary variables
     // Variable reference, where id == variable id
     struct var_base {};
     template<int id>
@@ -245,12 +297,28 @@ namespace cr::gen
         static constexpr int value = id;
     };
 
+    // Temporary Variable reference, where id == variable id
+    struct tvar_base {};
+    template<int id>
+    struct tvar : tvar_base
+    {
+        static constexpr int value = id;
+    };
+
+    // User Variable reference, where id == variable id
+    struct uvar_base {};
+    template<int id>
+    struct uvar : uvar_base
+    {
+        static constexpr int value = id;
+    };
+
     // Assign and continue
     struct asc_base {};
-    template<int LHS_, typename RHS_>
+    template<typename LHS_, typename RHS_>
     struct asc : asc_base
     {
-        static constexpr int lhs = LHS_;
+        using lhs = LHS_;
         using rhs = RHS_;
     };
 
@@ -433,6 +501,12 @@ namespace cr::gen
                     
                     return inlined_scope::template function_impl<user_argument_count>(args...);
                 }
+                else if constexpr (std::is_base_of_v<tid_base, stmt>)
+                {
+                    return ::cr::gen::interpreter
+                        ::parse_stmts<originalDatastructure, memberFunction, stmt, stmts...>
+                        ::template function_temporary_id<user_argument_count>(args...);
+                }
                 else if constexpr (std::is_base_of_v<echo_base, stmt>)
                 {
                     return ::cr::gen::interpreter
@@ -468,6 +542,18 @@ namespace cr::gen
                     return ::cr::gen::interpreter
                         ::parse_stmts<originalDatastructure, memberFunction, stmt, stmts...>
                         ::template function_var<user_argument_count>(args...);
+                }
+                else if constexpr(std::is_base_of_v<tvar_base, stmt>)
+                {
+                    return ::cr::gen::interpreter
+                        ::parse_stmts<originalDatastructure, memberFunction, stmt, stmts...>
+                        ::template function_tvar<user_argument_count>(args...);
+                }
+                else if constexpr(std::is_base_of_v<uvar_base, stmt>)
+                {
+                    return ::cr::gen::interpreter
+                        ::parse_stmts<originalDatastructure, memberFunction, stmt, stmts...>
+                        ::template function_uvar<user_argument_count>(args...);
                 }
                 else if constexpr(std::is_base_of_v<add_base, stmt>)
                 {
@@ -624,11 +710,60 @@ namespace cr::gen
                     if constexpr (sizeof...(Arguments) == 0)
                     {
                         // Error, not possible to expand
-                        return;
+                        return ::cr::meta::unreachable();
                     }
                     else
                     {
                         return get_argument<count - 1>(args...);
+                    }
+                }
+            }
+
+            template<int user_limit, int count, typename Argument, typename... Arguments>
+            static inline auto& get_user_argument(Argument&& arg [[maybe_unused]], Arguments&&... args [[maybe_unused]])
+            {
+                // We reached the end
+                if constexpr (count == user_limit + 1)
+                {
+                    // Error, not possible to expand
+                    return ::cr::meta::unreachable();
+                }
+
+                if constexpr (count <= 0)
+                {
+                    return (Argument&)arg;
+                }
+                else
+                {
+                    if constexpr (sizeof...(Arguments) == 0)
+                    {
+                        // Error, not possible to expand
+                        return ::cr::meta::unreachable();
+                    }
+                    else
+                    {
+                        return get_user_argument<user_limit, count - 1>(args...);
+                    }
+                }
+            }
+
+            template<int count, typename Argument, typename... Arguments>
+            static inline auto& get_temporary_argument(Argument&& arg [[maybe_unused]], Arguments&&... args [[maybe_unused]])
+            {
+                if constexpr(count <= 0)
+                {
+                    return (Argument&)arg;
+                }
+                else
+                {
+                    if constexpr (sizeof...(Arguments) == 0)
+                    {
+                        // Error, not possible to expand
+                        return ::cr::meta::unreachable();
+                    }
+                    else
+                    {
+                        return get_temporary_argument<count - 1>(args...);
                     }
                 }
             }
@@ -649,6 +784,56 @@ namespace cr::gen
                 else
                 {
                     return get_argument<stmt::value + 1>(args...);
+                }
+            }
+
+            template<int user_argument_count, typename... Arguments>
+            static inline auto function_uvar(Arguments&&... args [[maybe_unused]])
+            {
+                if constexpr (sizeof...(Arguments) == 0)
+                {
+                    // Error, nothing to retrieve
+                    return;
+                }
+                else if constexpr (stmt::value >= sizeof...(Arguments))
+                {
+                    // Tried to access argument that does not exist
+                    return;
+                }
+                else
+                {
+                    return get_user_argument<user_argument_count, stmt::value + 1>(args...);
+                }
+            }
+
+            template<int user_argument_count, typename... Arguments>
+            static inline int function_uid(Arguments&&... args [[maybe_unused]])
+            {
+                return stmt::value;
+            }
+
+            template<int user_argument_count, typename... Arguments>
+            static inline int function_temporary_id(Arguments&&... args [[maybe_unused]])
+            {
+                return user_argument_count + stmt::value;
+            }
+
+            template<int user_argument_count, typename... Arguments>
+            static inline auto function_tvar(Arguments&&... args [[maybe_unused]])
+            {
+                if constexpr (sizeof...(Arguments) == 0)
+                {
+                    // Error, nothing to retrieve
+                    return;
+                }
+                else if constexpr (stmt::value >= sizeof...(Arguments))
+                {
+                    // Tried to access argument that does not exist
+                    return;
+                }
+                else
+                {
+                    return get_temporary_argument<stmt::value + 1 + user_argument_count>(args...);
                 }
             }
 
@@ -728,12 +913,23 @@ namespace cr::gen
             static inline auto function_assign_and_continue(Arguments&&... args [[maybe_unused]])
             {
                 // Assign and continue to the next statement.
-                get_argument<stmt::lhs + 1>(args...)
-                    =
-                    ::cr::gen::interpreter
-                    ::parse_stmts<originalDatastructure, memberFunction, typename stmt::rhs>
-                    ::template function_impl<user_argument_count>(args...);
-                
+                if constexpr(std::is_base_of_v<tid_base, typename stmt::lhs>)
+                {
+                    get_argument<stmt::lhs::value + user_argument_count + 1>(args...)
+                        =
+                        ::cr::gen::interpreter
+                        ::parse_stmts<originalDatastructure, memberFunction, typename stmt::rhs>
+                        ::template function_impl<user_argument_count>(args...);
+                }
+                else if constexpr(std::is_base_of_v<uid_base, typename stmt::lhs>)
+                {
+                    get_argument<stmt::lhs::value + 1>(args...)
+                        =
+                        ::cr::gen::interpreter
+                        ::parse_stmts<originalDatastructure, memberFunction, typename stmt::rhs>
+                        ::template function_impl<user_argument_count>(args...);
+                }
+                           
                 return ::cr::gen::interpreter
                     ::parse_stmts<originalDatastructure, memberFunction, stmts...>
                     ::template function_impl<user_argument_count>(args...);
@@ -850,7 +1046,7 @@ namespace cr::gen
                         }
                         else
                         {
-                            using T = typename ::cr::meta::template extract_variadic<::cr::gen::interpreter::parse_stmts, originalDatastructure, memberFunction, typename stmt::action_stmt>
+                            using T = typename ::cr::meta::template extract_variadic<::cr::gen::interpreter::parse_stmts, originalDatastructure, memberFunction>
                                 ::template forward_skip_until_not_sub_of_t<
                                     ::cr::meta::VariadicTypenameCache<elif_base>,
                                     ::cr::meta::VariadicTypenameCache<stmts...>
@@ -914,7 +1110,7 @@ namespace cr::gen
                         }
                         else
                         {
-                            using T = typename ::cr::meta::template extract_variadic<::cr::gen::interpreter::parse_stmts, originalDatastructure, memberFunction, typename stmt::action_stmt>
+                            using T = typename ::cr::meta::template extract_variadic<::cr::gen::interpreter::parse_stmts, originalDatastructure, memberFunction>
                                 ::template forward_skip_until_not_sub_of_t<
                                     ::cr::meta::VariadicTypenameCache<elif_base>,
                                     ::cr::meta::VariadicTypenameCache<stmts...>
@@ -1448,6 +1644,29 @@ namespace cr::gen
                                     using type = typename GetTypeFromIdImpl<id, Ts...>::type;
                                 };
 
+                                template<int id>
+                                struct GetMemberFunctionFromId
+                                {
+                                    template<int id_, typename... Ts_>
+                                    struct GetTypeFromIdImpl
+                                    {
+                                        using type = void;
+                                    };
+
+                                    template<int count, typename T_, typename... Ts_>
+                                    struct GetTypeFromIdImpl<count, T_, Ts_...>
+                                    {
+                                        using type = typename GetTypeFromIdImpl<count - 1, Ts_...>::type;
+                                    };
+
+                                    template<typename T_, typename... Ts_>
+                                    struct GetTypeFromIdImpl<0, T_, Ts_...>
+                                    {
+                                        using type = T_;
+                                    };
+                                    using type = typename GetTypeFromIdImpl<id, MemberFunctionTs...>::type;
+                                };
+
                                 template<const str& idName>
                                 struct GetIdFromName
                                 {
@@ -1535,6 +1754,7 @@ namespace cr::gen
                                     return requiredInheritLeaf::template get<localId>();
                                 }
                             }
+
                             template<const str& idName>
                             auto& get()
                             {
@@ -1545,6 +1765,12 @@ namespace cr::gen
                                     Implementation,
                                     typename meta::template GetTypeFromId<id>::type
                                 >::value;
+                            }
+
+                            template<int id, typename... Arguments>
+                            auto call(Arguments&&... args)
+                            {
+                                return this->MemberFunctionLeaf<id, this_type, typename this_type::meta::template GetMemberFunctionFromId<id>::type>::function_start(args...);
                             }
                         };
                         using type = Implementation;
@@ -1577,5 +1803,6 @@ namespace cr::gen
         using type = typename ::cr::gen::stuc<>::names<>::inherit<InheritTs...>::type;
     };
 }
+
 
 #endif // CR_CORE_META_FUNCTION_HEADER_CR_H
