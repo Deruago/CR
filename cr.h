@@ -6,6 +6,8 @@
 #define CR_CORE_META_FUNCTION_HEADER_CR_H
 
 #include <type_traits>
+#include <utility>
+#include <iostream>
 
 namespace cr
 {
@@ -14,26 +16,6 @@ namespace cr
 
 namespace cr::meta
 {
-    template<typename... Ts>
-    struct VariadicTypenameCache
-    {
-        
-    };
-
-    template<template<typename...> typename target, typename... finiteArgs>
-    struct extract_variadic
-    {
-        template<typename... variadic>
-        static auto forward(::cr::meta::VariadicTypenameCache<variadic...>)
-        {
-            using new_forwarded_type = target<finiteArgs..., variadic...>;
-            return std::declval<new_forwarded_type>();
-        }
-
-        template<typename variadic>
-        using forward_t = decltype(forward(std::declval<variadic>()));
-    };
-
     template<typename... Ts>
     struct FirstOfVariadic
     {
@@ -63,6 +45,131 @@ namespace cr::meta
     {
         using type = T;
     };
+
+    template<typename... Ts>
+    struct VariadicTypenameCache
+    {
+        template<typename T>
+        static constexpr bool contains_base_of()
+        {
+            return false;
+        } 
+
+        template<typename T>
+        static constexpr bool contains()
+        {
+            return false;
+        }
+    };
+
+    template<typename T, typename... Ts>
+    struct VariadicTypenameCache<T, Ts...>
+    {
+        template<typename T_>
+        static constexpr bool contains_base_of()
+        {
+            if constexpr (::std::is_base_of_v<T, T_>)
+            {
+                return true;
+            }
+            else
+            {
+                return VariadicTypenameCache<Ts...>::template contains_base_of<T_>();
+            }
+        } 
+
+        template<typename T_>
+        static constexpr bool contains()
+        {
+            if constexpr (::std::is_same_v<T, T_>)
+            {
+                return true;
+            }
+            else
+            {
+                return VariadicTypenameCache<Ts...>::template contains<T_>();
+            }
+        }
+    };
+
+    template<template<typename...> typename target, typename... finiteArgs>
+    struct extract_variadic
+    {
+        template<typename... variadic>
+        static auto forward(::cr::meta::VariadicTypenameCache<variadic...>)
+        {
+            using new_forwarded_type = target<finiteArgs..., variadic...>;
+            return new_forwarded_type{};
+            //return std::declval<new_forwarded_type>();
+        }
+        template<typename... infiniteArgs_>
+        struct insert_tmp
+        {
+            template<typename... variadic>
+            static auto forward(::cr::meta::VariadicTypenameCache<variadic...>)
+            {
+                using new_forwarded_type = target<finiteArgs..., infiniteArgs_..., variadic...>;
+                return new_forwarded_type{};
+            }
+        };
+
+        template<typename org, typename... variadic>
+        static auto forward_p(org, ::cr::meta::VariadicTypenameCache<variadic...>)
+        {
+            using new_forwarded_type = decltype(insert_tmp<variadic...>::template forward(std::declval<org>()));
+            return new_forwarded_type{};
+        }
+
+        template<typename first, typename... variadic>
+        static auto forward_skip_first(::cr::meta::VariadicTypenameCache<first, variadic...>)
+        {
+            using new_forwarded_type = target<finiteArgs..., variadic...>;
+            return new_forwarded_type{};
+            //return std::declval<new_forwarded_type>();
+        }
+
+        template<typename blacklistedTypes, typename first, typename... variadic>
+        static auto forward_skip_until_not_of(::cr::meta::VariadicTypenameCache<first, variadic...>)
+        {
+            if constexpr (blacklistedTypes
+                ::template contains<first>())
+            {
+                return forward_skip_until_not_of<blacklistedTypes>(::cr::meta::VariadicTypenameCache<variadic...>{});
+            }
+            else
+            {
+                using new_forwarded_type = target<finiteArgs..., first, variadic...>;
+                return new_forwarded_type{};
+            }
+        }
+
+        template<typename blacklistedBases, typename first, typename... variadic>
+        static auto forward_skip_until_not_sub_of(::cr::meta::VariadicTypenameCache<first, variadic...>)
+        {
+            if constexpr (blacklistedBases
+                ::template contains_base_of<first>())
+            {
+                return forward_skip_until_not_sub_of<blacklistedBases>(::cr::meta::VariadicTypenameCache<variadic...>{});
+            }
+            else
+            {
+                using new_forwarded_type = target<finiteArgs..., first, variadic...>;
+                return new_forwarded_type{};
+            }
+        }
+
+        template<typename variadic>
+        using forward_t = decltype(forward(std::declval<variadic>()));
+
+        template<typename variadic>
+        using forward_skip_first_t = decltype(forward_skip_first(std::declval<variadic>()));
+
+        template<typename blacklistedBases, typename variadic>
+        using forward_skip_until_not_sub_of_t = decltype(forward_skip_until_not_sub_of<blacklistedBases>(std::declval<variadic>()));
+
+        template<typename blacklistedBases, typename variadic>
+        using forward_skip_until_not_of_t = decltype(forward_skip_until_not_of<blacklistedBases>(std::declval<variadic>()));
+    };
 }
 
 namespace cr::gen
@@ -72,6 +179,33 @@ namespace cr::gen
     {
         using returnType = returnType_;
         using stmts =  typename ::cr::meta::VariadicTypenameCache<statements...>;
+    };
+
+    // Used to avoid issues with return type evaluation with recursive functions.
+    struct stop_evaluation_base {};
+    struct stop_evaluation : stop_evaluation_base
+    {};
+
+    struct noop_base {};
+    struct noop : noop_base
+    {};
+
+     struct end_function_base {};
+    struct end_function : end_function_base
+    {};
+
+    struct scope_base {};
+    template<typename... scope_stmts>
+    struct scope : scope_base
+    {
+        using type = ::cr::meta::VariadicTypenameCache<scope_stmts...>;
+    };
+
+    struct echo_base {};
+    template<typename echo_stmt>
+    struct echo : echo_base
+    {
+        using type = echo_stmt;
     };
 
     struct create_variable_base {};
@@ -109,6 +243,23 @@ namespace cr::gen
     struct var : var_base
     {
         static constexpr int value = id;
+    };
+
+    // Assign and continue
+    struct asc_base {};
+    template<int LHS_, typename RHS_>
+    struct asc : asc_base
+    {
+        static constexpr int lhs = LHS_;
+        using rhs = RHS_;
+    };
+
+    struct ass_base {};
+    template<typename LHS_, typename RHS_>
+    struct ass : ass_base
+    {
+        using lhs = LHS_;
+        using rhs = RHS_;
     };
 
     struct add_base {};
@@ -207,6 +358,14 @@ namespace cr::gen
         using action_stmt = action_stmt_;
     };
 
+    struct while_base {};
+    template<typename conditional_stmt_, typename action_stmt_>
+    struct whil : while_base
+    {
+        using conditional_stmt = conditional_stmt_;
+        using action_stmt = action_stmt_;
+    };
+
     struct else_base {};
     template<typename action_stmt_>
     struct els : else_base
@@ -248,9 +407,39 @@ namespace cr::gen
             template<int user_argument_count, typename... Arguments>
             static inline auto function_impl(Arguments&&... args [[maybe_unused]])
             {
+                return function_impl_dispatcher<user_argument_count>(args...);
+            }
+
+            template<int user_argument_count, typename... Arguments>
+            static inline auto function_impl_dispatcher(Arguments&&... args [[maybe_unused]])
+            {
                 // Dispatcher for stmt resolvement
                 // Uses a concrete base check, to validate the type of stmt
-                if constexpr (std::is_base_of_v<create_variable_base, stmt>)
+                if constexpr(std::is_base_of_v<stop_evaluation_base, stmt>)
+                {
+                    return;
+                }
+                else if constexpr(std::is_base_of_v<end_function_base, stmt>)
+                {
+                    return;
+                }
+                else if constexpr (std::is_base_of_v<scope_base, stmt>)
+                {
+                    // Find something to extract 2 variadic statements
+                    using inlined_scope = decltype(::cr::meta::extract_variadic<parse_stmts, originalDatastructure, memberFunction>::forward_p(
+                        ::cr::meta::VariadicTypenameCache<stmts...>{},
+                        typename stmt::type{}
+                    ));
+                    
+                    return inlined_scope::template function_impl<user_argument_count>(args...);
+                }
+                else if constexpr (std::is_base_of_v<echo_base, stmt>)
+                {
+                    return ::cr::gen::interpreter
+                        ::parse_stmts<originalDatastructure, memberFunction, stmt, stmts...>
+                        ::template function_echo<user_argument_count>(args...);
+                }
+                else if constexpr (std::is_base_of_v<create_variable_base, stmt>)
                 {
                     return ::cr::gen::interpreter
                         ::parse_stmts<originalDatastructure, memberFunction, stmt, stmts...>
@@ -364,10 +553,51 @@ namespace cr::gen
                         ::parse_stmts<originalDatastructure, memberFunction, stmt, stmts...>
                         ::template function_forc<user_argument_count>(args...);
                 }
+                else if constexpr(std::is_base_of_v<while_base, stmt>)
+                {
+                    if constexpr(!std::is_same_v<typename ::cr::meta::FirstOfVariadic<stmts...>::type, stop_evaluation>)
+                    {
+                        return ::cr::gen::interpreter
+                            ::parse_stmts<originalDatastructure, memberFunction, stmt, stmts...>
+                            ::template function_while<user_argument_count>(args...);
+                    }
+                    else
+                    {
+                        ::cr::gen::interpreter
+                            ::parse_stmts<originalDatastructure, memberFunction, stmt, stmts...>
+                            ::template function_while_void<user_argument_count>(args...);
+                       return typename memberFunction::returnType{};
+                    }
+                }
+                else if constexpr(std::is_base_of_v<ass_base, stmt>)
+                {
+                    return ::cr::gen::interpreter
+                        ::parse_stmts<originalDatastructure, memberFunction, stmt, stmts...>
+                        ::template function_assign<user_argument_count>(args...);
+                }
+                else if constexpr(std::is_base_of_v<asc_base, stmt>)
+                {
+                    return ::cr::gen::interpreter
+                        ::parse_stmts<originalDatastructure, memberFunction, stmt, stmts...>
+                        ::template function_assign_and_continue<user_argument_count>(args...);
+                }
                 else
                 {
                     return typename memberFunction::returnType{};
                 }
+            }
+
+            template<int user_argument_count, typename... Arguments>
+            static inline auto function_echo(Arguments&&... args [[maybe_unused]])
+            {
+                auto val = ::cr::gen::interpreter
+                    ::parse_stmts<originalDatastructure, memberFunction, typename stmt::type>
+                    ::template function_impl<user_argument_count>(args...);
+                std::cout << val << "\n";
+                
+                return ::cr::gen::interpreter
+                    ::parse_stmts<originalDatastructure, memberFunction, stmts...>
+                    ::template function_impl<user_argument_count>(args...);
             }
 
             template<int user_argument_count, typename... Arguments>
@@ -383,11 +613,11 @@ namespace cr::gen
             }
 
             template<int count, typename Argument, typename... Arguments>
-            static inline auto get_argument(Argument&& arg [[maybe_unused]], Arguments&&... args [[maybe_unused]])
+            static inline auto& get_argument(Argument&& arg [[maybe_unused]], Arguments&&... args [[maybe_unused]])
             {
                 if constexpr(count <= 0)
                 {
-                    return arg;
+                    return (Argument&)arg;
                 }
                 else
                 {
@@ -483,6 +713,33 @@ namespace cr::gen
             }
 
             template<int user_argument_count, typename... Arguments>
+            static inline auto function_assign(Arguments&&... args [[maybe_unused]])
+            {
+                return ::cr::gen::interpreter
+                    ::parse_stmts<originalDatastructure, memberFunction, typename stmt::lhs>
+                    ::template function_impl<user_argument_count, Arguments...>(args...)
+                    =
+                    ::cr::gen::interpreter
+                    ::parse_stmts<originalDatastructure, memberFunction, typename stmt::rhs>
+                    ::template function_impl<user_argument_count, Arguments...>(args...);
+            }
+
+            template<int user_argument_count, typename... Arguments>
+            static inline auto function_assign_and_continue(Arguments&&... args [[maybe_unused]])
+            {
+                // Assign and continue to the next statement.
+                get_argument<stmt::lhs + 1>(args...)
+                    =
+                    ::cr::gen::interpreter
+                    ::parse_stmts<originalDatastructure, memberFunction, typename stmt::rhs>
+                    ::template function_impl<user_argument_count>(args...);
+                
+                return ::cr::gen::interpreter
+                    ::parse_stmts<originalDatastructure, memberFunction, stmts...>
+                    ::template function_impl<user_argument_count>(args...);
+            }
+
+            template<int user_argument_count, typename... Arguments>
             static inline auto function_eq(Arguments&&... args [[maybe_unused]])
             {
                 return ::cr::gen::interpreter
@@ -554,7 +811,6 @@ namespace cr::gen
                     ::template function_impl<user_argument_count, Arguments...>(args...);
             }
 
-
             template<int user_argument_count, typename... Arguments>
             static inline auto function_if(Arguments&&... args [[maybe_unused]])
             {
@@ -566,8 +822,12 @@ namespace cr::gen
                         if (::cr::gen::interpreter::parse_stmts<originalDatastructure, memberFunction, typename stmt::conditional_stmt>
                             ::template function_impl<user_argument_count, Arguments...>(args...))
                         {
-                            return ::cr::gen::interpreter::parse_stmts<originalDatastructure, memberFunction, typename stmt::action_stmt, stmts...>
-                            ::template function_impl<user_argument_count, Arguments...>(args...);
+                            using T = typename ::cr::meta::template extract_variadic<::cr::gen::interpreter::parse_stmts, originalDatastructure, memberFunction, typename stmt::action_stmt>
+                                ::template forward_skip_until_not_sub_of_t<
+                                    ::cr::meta::VariadicTypenameCache<elif_base, else_base>,
+                                    ::cr::meta::VariadicTypenameCache<stmts...>
+                                >;
+                            return T::template function_impl<user_argument_count, Arguments...>(args...);
                         }
                         else
                         {
@@ -581,12 +841,22 @@ namespace cr::gen
                         if (::cr::gen::interpreter::parse_stmts<originalDatastructure, memberFunction, typename stmt::conditional_stmt>
                             ::template function_impl<user_argument_count, Arguments...>(args...))
                         {
-                            return ::cr::gen::interpreter::parse_stmts<originalDatastructure, memberFunction, typename stmt::action_stmt, stmts...>
-                            ::template function_impl<user_argument_count, Arguments...>(args...);
+                            using T = typename ::cr::meta::template extract_variadic<::cr::gen::interpreter::parse_stmts, originalDatastructure, memberFunction, typename stmt::action_stmt>
+                                ::template forward_skip_until_not_sub_of_t<
+                                    ::cr::meta::VariadicTypenameCache<elif_base, else_base>,
+                                    ::cr::meta::VariadicTypenameCache<stmts...>
+                                >;
+                            return T::template function_impl<user_argument_count, Arguments...>(args...);
                         }
-
-                        return ::cr::gen::interpreter::parse_stmts<originalDatastructure, memberFunction, stmts...>
-                            ::template function_impl<user_argument_count, Arguments...>(args...);
+                        else
+                        {
+                            using T = typename ::cr::meta::template extract_variadic<::cr::gen::interpreter::parse_stmts, originalDatastructure, memberFunction, typename stmt::action_stmt>
+                                ::template forward_skip_until_not_sub_of_t<
+                                    ::cr::meta::VariadicTypenameCache<elif_base>,
+                                    ::cr::meta::VariadicTypenameCache<stmts...>
+                                >;
+                            return T::template function_impl<user_argument_count, Arguments...>(args...);
+                        }
                     }
                 }
                 else
@@ -616,8 +886,12 @@ namespace cr::gen
                         if (::cr::gen::interpreter::parse_stmts<originalDatastructure, memberFunction, typename stmt::conditional_stmt>
                             ::template function_impl<user_argument_count, Arguments...>(args...))
                         {
-                            return ::cr::gen::interpreter::parse_stmts<originalDatastructure, memberFunction, typename stmt::action_stmt, stmts...>
-                            ::template function_impl<user_argument_count, Arguments...>(args...);
+                            using T = typename ::cr::meta::template extract_variadic<::cr::gen::interpreter::parse_stmts, originalDatastructure, memberFunction, typename stmt::action_stmt>
+                                ::template forward_skip_until_not_sub_of_t<
+                                    ::cr::meta::VariadicTypenameCache<elif_base, else_base>,
+                                    ::cr::meta::VariadicTypenameCache<stmts...>
+                                >;
+                            return T::template function_impl<user_argument_count, Arguments...>(args...);
                         }
                         else
                         {
@@ -631,12 +905,22 @@ namespace cr::gen
                         if (::cr::gen::interpreter::parse_stmts<originalDatastructure, memberFunction, typename stmt::conditional_stmt>
                             ::template function_impl<user_argument_count, Arguments...>(args...))
                         {
-                            return ::cr::gen::interpreter::parse_stmts<originalDatastructure, memberFunction, typename stmt::action_stmt, stmts...>
-                            ::template function_impl<user_argument_count, Arguments...>(args...);
+                            using T = typename ::cr::meta::template extract_variadic<::cr::gen::interpreter::parse_stmts, originalDatastructure, memberFunction, typename stmt::action_stmt>
+                                ::template forward_skip_until_not_sub_of_t<
+                                    ::cr::meta::VariadicTypenameCache<elif_base, else_base>,
+                                    ::cr::meta::VariadicTypenameCache<stmts...>
+                                >;
+                            return T::template function_impl<user_argument_count, Arguments...>(args...);
                         }
-
-                        return ::cr::gen::interpreter::parse_stmts<originalDatastructure, memberFunction, stmts...>
-                            ::template function_impl<user_argument_count, Arguments...>(args...);
+                        else
+                        {
+                            using T = typename ::cr::meta::template extract_variadic<::cr::gen::interpreter::parse_stmts, originalDatastructure, memberFunction, typename stmt::action_stmt>
+                                ::template forward_skip_until_not_sub_of_t<
+                                    ::cr::meta::VariadicTypenameCache<elif_base>,
+                                    ::cr::meta::VariadicTypenameCache<stmts...>
+                                >;
+                            return T::template function_impl<user_argument_count, Arguments...>(args...);
+                        }
                     }
                 }
                 else
@@ -668,6 +952,27 @@ namespace cr::gen
             }
 
             template<int user_argument_count, typename... Arguments>
+            static inline auto function_while(Arguments&&... args [[maybe_unused]])
+            {
+                if (::cr::gen::interpreter::parse_stmts<originalDatastructure, memberFunction, typename stmt::conditional_stmt>
+                ::template function_impl<user_argument_count>(args...))
+                {
+                    // If the conditional maps to true, we insert an action and come back to this function by recursion
+                    return ::cr::gen::interpreter::parse_stmts<originalDatastructure, memberFunction, typename stmt::action_stmt, stmt, stop_evaluation, stmts...>
+                        ::template function_impl<user_argument_count>(args...);
+                }
+                else
+                {
+                    // Otherwise, we continue without inserting statements
+                    return ::cr::gen::interpreter::parse_stmts<originalDatastructure, memberFunction, stmts...>
+                    ::template function_impl<user_argument_count>(args...);
+                }
+            }
+
+            template<int user_argument_count, typename... Arguments>
+            static inline void function_while_void(Arguments&&... args [[maybe_unused]]);
+
+            template<int user_argument_count, typename... Arguments>
             static inline typename memberFunction::returnType function_return_variable(Arguments&&... args [[maybe_unused]])
             {                
                 return ::cr::gen::interpreter
@@ -675,6 +980,25 @@ namespace cr::gen
                     ::template function_impl<user_argument_count>(args...);
             }
         };
+
+        template<typename originalDatastructure, typename memberFunction, typename stmt, typename... stmts>
+        template<int user_argument_count, typename... Arguments>
+        inline void parse_stmts<originalDatastructure, memberFunction, stmt, stmts...>::function_while_void(Arguments&&... args [[maybe_unused]])
+        {
+            if (::cr::gen::interpreter::parse_stmts<originalDatastructure, memberFunction, typename stmt::conditional_stmt>
+            ::template function_impl<user_argument_count>(args...))
+            {
+                // If the conditional maps to true, we insert an action and come back to this function by recursion
+                ::cr::gen::interpreter::parse_stmts<originalDatastructure, memberFunction, typename stmt::action_stmt, stmt, stmts...>
+                    ::template function_impl<user_argument_count>(args...);
+            }
+            else
+            {
+                // Otherwise, we continue without inserting statements
+                ::cr::gen::interpreter::parse_stmts<originalDatastructure, memberFunction, stmts...>
+                ::template function_impl<user_argument_count>(args...);
+            }
+            }
     }
 
     template<typename originalDatastructure, typename memberFunction>
@@ -685,7 +1009,7 @@ namespace cr::gen
             template<typename... stmts>
             static auto retrieve_stmt(::cr::meta::VariadicTypenameCache<stmts...>)
             {
-                return interpreter::parse_stmts<originalDatastructure, memberFunction, stmts...>{};
+                return interpreter::parse_stmts<originalDatastructure, memberFunction, stmts..., end_function>{};
                 // return std::declval<interpreter
                 //     ::parse_stmts<originalDatastructure, memberFunction, stmts...>>();
             }
@@ -709,7 +1033,7 @@ namespace cr::gen
                     typename memberFunction::stmts{}
                 )
             );
-            return parse_stmts::template function_start<user_argument_count, Arguments...>(this, args...);
+            return parse_stmts::template function_start<user_argument_count>(this, args...);
         }
     };
 }
