@@ -18,6 +18,13 @@ namespace cr::meta
 {
     [[noreturn]] inline void unreachable()
     {
+#ifdef __GNUC__ // GCC, Clang, ICC
+    __builtin_unreachable();
+#else
+#ifdef _MSC_VER // MSVC
+    __assume(false);
+#endif
+#endif
     }
 
     template<typename... Ts>
@@ -442,10 +449,11 @@ namespace cr::gen
     };
 
     struct forc_base {};
-    template<typename for_count_stmt_>
+    template<int count, typename for_count_stmt_>
     struct forc : forc_base
     {
-        using for_count_stmt = for_count_stmt_;
+        static constexpr int value = count;
+        using action_stmt = for_count_stmt_;
     };
 }
 
@@ -1155,6 +1163,21 @@ namespace cr::gen
             template<int user_argument_count, typename... Arguments>
             static inline auto function_forc(Arguments&&... args [[maybe_unused]])
             {
+                if constexpr (stmt::value == 0)
+                {
+                    return ::cr::gen::interpreter
+                        ::parse_stmts<originalDatastructure, memberFunction,
+                            typename stmt::action_stmt, stmts...>
+                        ::template function_impl<user_argument_count>(args...);
+                }
+                else
+                {
+                    return ::cr::gen::interpreter
+                        ::parse_stmts<originalDatastructure, memberFunction,
+                            typename stmt::action_stmt,
+                            forc<stmt::value - 1, typename stmt::action_stmt>, stmts...>
+                        ::template function_impl<user_argument_count>(args...);
+                }
             }
 
             template<int user_argument_count, typename... Arguments>
@@ -1847,6 +1870,5 @@ namespace cr::gen
         using type = typename ::cr::gen::stuc<>::names<>::inherit<InheritTs...>::type;
     };
 }
-
 
 #endif // CR_CORE_META_FUNCTION_HEADER_CR_H
