@@ -485,7 +485,8 @@ namespace cr::gen
                 // Uses a concrete base check, to validate the type of stmt
                 if constexpr(std::is_base_of_v<stop_evaluation_base, stmt>)
                 {
-                    return;
+                    return ::cr::gen::interpreter
+                        ::parse_stmts<originalDatastructure, memberFunction, stmts...>::template function_impl<user_argument_count>(args...);
                 }
                 else if constexpr(std::is_base_of_v<end_function_base, stmt>)
                 {
@@ -649,10 +650,19 @@ namespace cr::gen
                     }
                     else
                     {
-                        ::cr::gen::interpreter
-                            ::parse_stmts<originalDatastructure, memberFunction, stmt, stmts...>
-                            ::template function_while_void<user_argument_count>(args...);
-                       return typename memberFunction::returnType{};
+                        if constexpr (sizeof...(stmts) == 0)
+                        {
+                            ::cr::gen::interpreter
+                                ::parse_stmts<originalDatastructure, memberFunction, stmt, stmts...>
+                                ::template function_while_void<user_argument_count>(args...);
+                            return typename memberFunction::returnType{};
+                        }
+                        else
+                        {
+                            return ::cr::gen::interpreter
+                                ::parse_stmts<originalDatastructure, memberFunction, stmt, stmts...>
+                                ::template function_while_next<user_argument_count>(args...);
+                        }
                     }
                 }
                 else if constexpr(std::is_base_of_v<ass_base, stmt>)
@@ -1166,7 +1176,14 @@ namespace cr::gen
             }
 
             template<int user_argument_count, typename... Arguments>
-            static inline void function_while_void(Arguments&&... args [[maybe_unused]]);
+            static inline auto function_while_void(Arguments&&... args [[maybe_unused]]) -> void;
+
+            template<int user_argument_count, typename... Arguments>
+            static inline auto function_while_next(Arguments&&... args [[maybe_unused]]) -> decltype(
+                ::cr::gen::interpreter
+                ::parse_stmts<originalDatastructure, memberFunction, stmts...>
+                ::template function_impl<user_argument_count>(args...)
+            );
 
             template<int user_argument_count, typename... Arguments>
             static inline typename memberFunction::returnType function_return_variable(Arguments&&... args [[maybe_unused]])
@@ -1179,7 +1196,34 @@ namespace cr::gen
 
         template<typename originalDatastructure, typename memberFunction, typename stmt, typename... stmts>
         template<int user_argument_count, typename... Arguments>
-        inline void parse_stmts<originalDatastructure, memberFunction, stmt, stmts...>::function_while_void(Arguments&&... args [[maybe_unused]])
+        inline
+        auto
+        parse_stmts<originalDatastructure, memberFunction, stmt, stmts...>::function_while_next(Arguments&&... args [[maybe_unused]]) -> decltype(
+            ::cr::gen::interpreter
+            ::parse_stmts<originalDatastructure, memberFunction, stmts...>
+            ::template function_impl<user_argument_count>(args...)
+        )
+        {
+            if (::cr::gen::interpreter::parse_stmts<originalDatastructure, memberFunction, typename stmt::conditional_stmt>
+            ::template function_impl<user_argument_count>(args...))
+            {
+                // If the conditional maps to true, we insert an action and come back to this function by recursion
+                return ::cr::gen::interpreter::parse_stmts<originalDatastructure, memberFunction, typename stmt::action_stmt, stmt, stmts...>
+                    ::template function_impl<user_argument_count>(args...);
+            }
+            else
+            {
+                // Otherwise, we continue without inserting statements
+                return ::cr::gen::interpreter::parse_stmts<originalDatastructure, memberFunction, stmts...>
+                ::template function_impl<user_argument_count>(args...);
+            }
+            }
+
+        template<typename originalDatastructure, typename memberFunction, typename stmt, typename... stmts>
+        template<int user_argument_count, typename... Arguments>
+        inline
+        auto
+        parse_stmts<originalDatastructure, memberFunction, stmt, stmts...>::function_while_void(Arguments&&... args [[maybe_unused]]) -> void
         {
             if (::cr::gen::interpreter::parse_stmts<originalDatastructure, memberFunction, typename stmt::conditional_stmt>
             ::template function_impl<user_argument_count>(args...))
