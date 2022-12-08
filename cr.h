@@ -1,5 +1,6 @@
 /* Made By: Thimo Böhmer
- * Date: November 2022
+ * Date: November 2022 - December 2022
+ * Copyright by: Thimo Böhmer
  */
 
 #ifndef CR_CORE_META_FUNCTION_HEADER_CR_H
@@ -1384,16 +1385,29 @@ namespace cr::gen
                         template<typename derived>
                         struct InheritScope : InheritImpl<0, derived, InheritTs...>
                         {
+                            template<int baseId, typename this_type, typename correctStruct>
+                            using GetLeaf = InheritLeaf<baseId, this_type, correctStruct>;
                         };
                         
                         template<typename derived>
                         struct DataScope : DataImpl<0, derived, Ts...>
                         {
+                            template<int localId, typename correctStruct, typename getT>
+                            using GetLeaf = DataLeaf<localId, correctStruct, getT>;
                         };
 
                         template<typename derived>
                         struct MemberFunctionScope : MemberFunctionImpl<0, derived, MemberFunctionTs...>
                         {
+                            template<int id, typename... Arguments>
+                            inline auto call(Arguments&&... args)
+                            {
+                                return this->template MemberFunctionLeaf<
+                                    id,
+                                    typename derived::this_type,
+                                    typename derived::this_type::meta::template GetMemberFunctionFromId<id>::type
+                                >::function_start(args...);
+                            }
                         };
 
                         struct Implementation : 
@@ -1806,7 +1820,8 @@ namespace cr::gen
                                 {
                                     using getT = typename correctStruct::meta::template GetTypeFromId<localId>::type;
 
-                                    using dataLeafLowered = typename DataScope<this_type>::template DataLeaf<localId, correctStruct, getT>;
+                                    using dataLeafLowered = 
+                                        typename DataScope<this_type>::template GetLeaf<localId, correctStruct, getT>;
 
                                     static_assert(std::is_base_of<
                                         dataLeafLowered,
@@ -1817,7 +1832,7 @@ namespace cr::gen
                                 }
                                 else
                                 {
-                                    using requiredInheritLeaf = typename InheritScope<this_type>::template InheritLeaf<baseId, this_type, correctStruct>;
+                                    using requiredInheritLeaf = typename InheritScope<this_type>::template GetLeaf<baseId, this_type, correctStruct>;
                                     return requiredInheritLeaf::template get<localId>();
                                 }
                             }
@@ -1837,7 +1852,7 @@ namespace cr::gen
                             template<int id, typename... Arguments>
                             auto call(Arguments&&... args)
                             {
-                                return this->MemberFunctionLeaf<id, this_type, typename this_type::meta::template GetMemberFunctionFromId<id>::type>::function_start(args...);
+                                return this->MemberFunctionScope<Implementation>::template call<id, Arguments...>(args...);
                             }
                         };
                         using type = Implementation;
