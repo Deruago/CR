@@ -1,6 +1,6 @@
 # CR: Compile-Time Reflection for C++17
 
-CR is a library which offers various meta functions which enable true compile time reflection in C++17.
+CR is a library which offers various meta functions which enable True Compile Time Reflection in C++17.
 
 ## Supported Functionality
 
@@ -23,6 +23,7 @@ CR is a library which offers various meta functions which enable true compile ti
 - Virtual Functions
 - Interfaces
 - Template Functions
+- Multiple Inheritance also supports Inheriting Member Functions
 
 ## Why use CR?
 
@@ -35,7 +36,7 @@ Thus making it possible to utilize it in most fields.
 
 ## Why use CR instead of alternative?
 
-Currently any "Reflection" library for C++17 is not an Reflection library, but instead is introspection. Introspection allows you to investigate the structs you create. However, introspection is not as Powerful as Reflection. True Reflection allows you to Generate Types, Generate Function, and much more.
+Currently any "Reflection" library for C++17 is not an Reflection library, but instead is an introspection library. Introspection allows you to investigate the structs you create. However, introspection is not as Powerful as Reflection. True Reflection allows you to Generate Types, Generate Function, and much more.
 
 CR is a True Compile Time Reflection. CR is currently the only library capable of actually generating types, functions, and more. Introspection is a natural consequence of its power.
 
@@ -85,6 +86,9 @@ CR is capable of generating types and member functions. There are a lot features
 
 It works with the latests version of Clang, and GCC.
 
+CR, is mainly developed with Clang. So Clang is generally always supported with latest releases. However, CR tries to also support GCC whenever possible.
+If some feature is not yet supported for other compilers this will be displayed in the section "Support".
+
 ## Type Inheritance
 ```C++
 #include "cr.h"
@@ -128,6 +132,46 @@ int main()
 
 ```
 
+## Enumeration Generation
+```C++
+// Create some unique types, used for type enumeration
+using red = struct {};
+using green = struct {};
+using blue = struct {};
+
+using color = ::cr::gen
+    ::enu<
+        red,
+        green,
+        blue
+    >::type;
+
+int main()
+{
+    color some_color = color::cons<green>;
+    switch(some_color)
+    {
+    case color::cons<red>: {
+        std::cout << "Red!\n";
+        break;
+    }
+    case color::cons<green>: {
+        std::cout << "Green!\n";
+        break;
+    }
+    case color::cons<blue>: {
+        std::cout << "Blue!\n";
+        break;
+    }
+    }
+    
+    return 0;
+}
+```
+
+Enumeration is simulated, however, the simulated enumeration behave exactly like C++ enumerations.
+
+The CR Enumerations enumerate over types. Thus you need a set of unique types.
 
 ## Member Function Generation
 ```C++
@@ -203,3 +247,9 @@ In order to construct functions, you need to use the dedicated instructions CR p
 | mod | lhs | rhs
 
 All these instructions are further defined at their specific doc.
+
+## Support
+
+- Clang: Fully
+- GCC: Fully
+- MSVC: Not Tested

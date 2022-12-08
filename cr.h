@@ -2,6 +2,14 @@
  * Date: November 2022 - December 2022
  * Copyright by: Thimo Böhmer
  */
+ 
+ /* I did not try my best at making something clean.
+  * Also I did not care, in its current state it is very modular.
+  * Well, modular for me at least.
+  *
+  * If you think you can improve it, or help me improve it.
+  * I am open to suggestions!
+  */
 
 #ifndef CR_CORE_META_FUNCTION_HEADER_CR_H
 #define CR_CORE_META_FUNCTION_HEADER_CR_H
@@ -1883,6 +1891,116 @@ namespace cr::gen
     struct inh
     {
         using type = typename ::cr::gen::stuc<>::names<>::inherit<InheritTs...>::type;
+    };
+
+    template<typename... EnumerationTypes>
+    struct enu
+    {
+        struct ImplementationCore
+        {
+            template<int count, typename OriginalT, typename DataT>
+            struct EnumerationLeaf
+            {
+                using original_type = OriginalT;
+                static constexpr int value = count;
+            };
+
+            template<int count, typename OriginalT, typename... DataTs>
+            struct EnumerationImpl
+            {
+            };
+
+            template<int count, typename OriginalT, typename DataT, typename... DataTs>
+            struct EnumerationImpl<count, OriginalT, DataT, DataTs...> : EnumerationLeaf<count, OriginalT, DataT>, EnumerationImpl<count + 1, OriginalT, DataTs...>
+            {
+            };
+
+            template<int count, typename OriginalT>
+            struct EnumerationImpl<count, OriginalT>
+            {
+            };
+
+            template<typename Derived>
+            struct EnumerationScope : EnumerationImpl<0, Derived, EnumerationTypes...>
+            {
+                template<int id, typename EnumerationType>
+                static constexpr int value()
+                {
+                    return EnumerationLeaf<id, Derived, EnumerationType>::value;
+                }
+            };
+
+            struct Implementation : EnumerationScope<Implementation>
+            {
+                using this_type = Implementation;
+
+                struct meta
+                {
+                    static constexpr auto total_owning_members = sizeof...(EnumerationTypes);
+
+                    // Including base members
+                    template<typename... ts_>
+                    struct GetTotalMembers
+                    {
+                        static constexpr auto value = 0;
+                    };
+
+                    template<typename t_, typename... ts_>
+                    struct GetTotalMembers<t_, ts_...>
+                    {
+                        static constexpr auto value = t_::meta::total_members + GetTotalMembers<ts_...>::value;
+                    };
+
+                    static constexpr auto total_members = total_owning_members;
+
+                    template<typename EnumerationType>
+                    struct GetId
+                    {
+                        template<int count, typename requestIdName, typename... idNames>
+                        struct GetIdFromNameImpl
+                        {
+                            static constexpr int value = count;
+                        };
+
+                        template<int count, typename requestIdName, typename currentIdName, typename... idNames>
+                        struct GetIdFromNameImpl<count, requestIdName, currentIdName, idNames...>
+                        {
+                            static constexpr int value = GetIdFromNameImpl<count + 1, requestIdName, idNames...>::value;
+                        };
+
+                        template<int count, typename requestIdName, typename... idNames>
+                        struct GetIdFromNameImpl<count, requestIdName, requestIdName, idNames...>
+                        {
+                            static constexpr int value = count;
+                        };
+                        static constexpr int value = GetIdFromNameImpl<0, EnumerationType, EnumerationTypes...>::value;
+                    };
+                };
+
+                template<typename EnumerationType>
+                static constexpr int valueImpl()
+                {
+                    return EnumerationScope<Implementation>
+                        ::template value<this_type::meta::template GetId<EnumerationType>::value, EnumerationType>();
+                }
+
+                template<typename EnumerationType>
+                static constexpr int cons = valueImpl<EnumerationType>();
+
+                int value = 0;
+
+                constexpr Implementation(int rhs) : value(rhs)
+                {
+                }
+
+                constexpr operator int()
+                {
+                    return value;
+                }
+            };
+        };
+
+        using type = typename ImplementationCore::Implementation;
     };
 }
 
