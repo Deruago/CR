@@ -1,13 +1,13 @@
 # CR: Compile-Time Reflection for C++17
 
-CR is a library which offers various meta functions which enable compile time reflection in C++17.
+CR is a library which offers various meta functions which enable true compile time reflection in C++17.
 
 ## Supported Functionality
 
 - Datastructure Generation
 - Multiple Inheritance of Datastructures
 - Naming of Members
-- Member Function Generation (While loops function, however, they automatically return upon a false condition)
+- Member Function Generation
 
 ## Planned Functionality
 
@@ -18,17 +18,28 @@ CR is a library which offers various meta functions which enable compile time re
 - Member Accessibility Levels
 - Improved Error Messages
 - Code Generation utilities
+- Enumeration Generation
+- Function Overloading
+- Virtual Functions
+- Interfaces
+- Template Functions
 
 ## Why use CR?
 
-CR is a true Compile-Time Reflection Library which focuses on minimal performance penalty.
+CR is a True Compile-Time Reflection Library which focuses on minimal performance penalty.
 The desire is to have meta-functions that have near identical performance as manually constructed types.
 If possible CR constructed types compile to identical types when using O2/O3 optimization levels.
 
 Comparing to other "Reflection" libraries, this library does not impose runtime performance hits.
 Thus making it possible to utilize it in most fields.
 
-## Example
+## Why use CR instead of alternative?
+
+Currently any "Reflection" library for C++17 is not an Reflection library, but instead is introspection. Introspection allows you to investigate the structs you create. However, introspection is not as Powerful as Reflection. True Reflection allows you to Generate Types, Generate Function, and much more.
+
+CR is a True Compile Time Reflection. CR is currently the only library capable of actually generating types, functions, and more. Introspection is a natural consequence of its power.
+
+## Datastructure Generation
 
 ```C++
 #include "cr.h"
@@ -68,11 +79,55 @@ CR is able to name members without any performance penalties.
 
 ## Current Status
 
-Very WIP, however, it seems to reliably work for creating datastructures.
+CR is capable of generating types and member functions. There are a lot features still planned, as CR allows a more powerful type-system than C++. Due to its design.
 
 ## Tested
 
 It works with the latests version of Clang, and GCC.
+
+## Type Inheritance
+```C++
+#include "cr.h"
+
+cr::str x{"x"};
+cr::str y{"y"};
+
+cr::str coord1{"coord1"};
+cr::str coord2{"coord2"};
+cr::str coord3{"coord3"};
+cr::str coord4{"coord4"};
+
+using Shape = ::cr::gen
+    ::stuc<>
+    ::type;
+
+using Point = ::cr::gen
+    ::stuc<int, int>
+    ::names<x, y>
+    ::type;
+
+using Triangle = ::cr::gen
+    ::stuc<Point, Point, Point>
+    ::names<coord1, coord2, coord3>
+    ::inherit<Shape>
+    ::type;
+
+using Square = ::cr::gen
+    ::stuc<Point, Point, Point, Point>
+    ::names<coord1, coord2, coord3, coord4>
+    ::inherit<Shape>
+    ::type;
+
+int main()
+{
+    Triangle triangle;
+    Square square;
+
+    Shape* shape = &square;
+}
+
+```
+
 
 ## Member Function Generation
 ```C++
